@@ -95,6 +95,7 @@ func _build_scene() -> void:
 func _build_ui() -> void:
 	_layer = CanvasLayer.new()
 	add_child(_layer)
+	_layer.add_child(FPSLabel.new())
 	_panel = ControlPanel.new()
 	_layer.add_child(_panel)
 	_panel.setup(settings)
