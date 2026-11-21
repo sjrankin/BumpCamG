@@ -12,6 +12,7 @@ uniform float shape_size = 0.95;
 uniform float height_amount = 2.0;
 uniform int height_mode = 1;
 uniform bool height_invert = false;
+uniform bool hue_pointer = false;
 uniform bool bar_mode = true;
 uniform int color_mode = 0;
 uniform float levels = 4.0;
@@ -69,6 +70,13 @@ void vertex() {
 	float h = clamp(height_value(c), 0.0, 1.0) * height_amount;
 	cell_color = srgb_to_linear(c);
 
+	if (hue_pointer) {
+		// Turn clockwise by the hue of the sampled colour (0 = up, a quarter turn = red-to-green).
+		float angle = -rgb_to_hsv(texelFetch(grid_tex, cell, 0).rgb).x * 6.28318530718;
+		mat2 turn = mat2(vec2(cos(angle), sin(angle)), vec2(-sin(angle), cos(angle)));
+		VERTEX.xy = turn * VERTEX.xy;
+		NORMAL.xy = turn * NORMAL.xy;
+	}
 	if (bar_mode) {
 		VERTEX.xy *= cell_size * shape_size;
 		VERTEX.z = (VERTEX.z + 0.5) * max(h, cell_size * 0.1);

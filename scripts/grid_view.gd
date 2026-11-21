@@ -57,6 +57,7 @@ func set_shape(new_shape: String) -> void:
 		return
 	_multimesh.mesh = ShapeLibrary.make(new_shape)
 	material.set_shader_parameter("bar_mode", ShapeLibrary.is_bar(new_shape))
+	material.set_shader_parameter("hue_pointer", ShapeLibrary.is_hue_pointer(new_shape))
 
 
 func set_columns(count: int) -> void:
