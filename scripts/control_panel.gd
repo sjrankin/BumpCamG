@@ -83,7 +83,7 @@ func setup(settings: Dictionary) -> void:
 	_add_heading("View")
 	_box.add_child(_make_button("Reset View (double-click)", func() -> void: reset_view_requested.emit()))
 	var hint := Label.new()
-	hint.text = "Drag: orbit. Right drag: pan. Wheel: zoom.\nDrop an image on the window."
+	hint.text = "Drag: move the image. Shift or right drag: orbit.\nWheel or pinch: zoom.\nDrop an image on the window."
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.custom_minimum_size.x = 1.0
 	hint.modulate = Color(1, 1, 1, 0.6)

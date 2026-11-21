@@ -1,7 +1,7 @@
 class_name OrbitCamera
 extends Node3D
-## Orbit / pan / zoom camera. Drag = orbit, right or middle drag = pan, wheel or pinch = zoom,
-## trackpad scroll = pan, double-click = reset to the original framing.
+## Orbit / pan / zoom camera. Drag (or middle drag) = move the image, Shift-drag or right drag = orbit,
+## wheel or pinch = zoom, trackpad scroll = pan, double-click = reset to the original framing.
 
 ## SceneKit's default implicit animation duration (SCNTransaction.animationDuration), in seconds.
 const SCENEKIT_DEFAULT_DURATION := 0.25
@@ -115,13 +115,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			reset_view_animated()
 	elif event is InputEventMouseMotion:
 		var motion := event as InputEventMouseMotion
-		if motion.button_mask & MOUSE_BUTTON_MASK_LEFT:
+		var orbiting := motion.button_mask & MOUSE_BUTTON_MASK_RIGHT \
+				or (motion.button_mask & MOUSE_BUTTON_MASK_LEFT and motion.shift_pressed)
+		if orbiting:
 			_stop_reset_tween()
 			_yaw -= motion.relative.x * 0.005
 			_pitch = clampf(_pitch - motion.relative.y * 0.005, -1.5, 1.5)
 			_moved = true
 			_apply()
-		elif motion.button_mask & (MOUSE_BUTTON_MASK_RIGHT | MOUSE_BUTTON_MASK_MIDDLE):
+		elif motion.button_mask & (MOUSE_BUTTON_MASK_LEFT | MOUSE_BUTTON_MASK_MIDDLE):
 			_pan(motion.relative)
 	elif event is InputEventMagnifyGesture:
 		_zoom(1.0 / maxf((event as InputEventMagnifyGesture).factor, 0.01))
