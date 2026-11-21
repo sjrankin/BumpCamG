@@ -14,8 +14,9 @@ const DEFAULTS := {
 	"shape_size": 0.95,
 	"color_mode": "Color",
 	"levels": 4.0,
+	"material": "Satin",
 	"metallic": 0.0,
-	"roughness": 0.6,
+	"roughness": 0.55,
 	"light": 1.0,
 	"shadows": true,
 	"mirror": true,
@@ -102,6 +103,7 @@ func _build_ui() -> void:
 	_panel.open_image_requested.connect(_show_open_dialog)
 	_panel.save_image_requested.connect(_show_save_dialog)
 	_panel.reset_view_requested.connect(_rig.reset_view_animated)
+	_panel.tour_requested.connect(func() -> void: _rig.start_tour(_grid.build_height_field()))
 
 	_open_dialog = FileDialog.new()
 	_open_dialog.use_native_dialog = true
@@ -155,6 +157,8 @@ func _load_settings() -> void:
 			var value: Variant = config.get_value("settings", key)
 			if typeof(value) == typeof(DEFAULTS[key]):
 				settings[key] = value
+	# The material name always reflects the saved sliders.
+	settings["material"] = SurfaceMaterials.name_for(float(settings["metallic"]), float(settings["roughness"]))
 	# "Inverse Brightness" was replaced by Brightness plus the Invert option.
 	if settings["height_mode"] == "Inverse Brightness":
 		settings["height_mode"] = "Brightness"
@@ -170,6 +174,17 @@ func _save_settings() -> void:
 
 func _on_setting_changed(key: String, value: Variant) -> void:
 	settings[key] = value
+	if key == "material" and SurfaceMaterials.PRESETS.has(str(value)):
+		# A named finish sets both sliders.
+		var preset: Dictionary = SurfaceMaterials.PRESETS[str(value)]
+		for property: String in preset:
+			settings[property] = preset[property]
+			_apply(property)
+			_panel.set_control_value(property, preset[property])
+	elif key == "metallic" or key == "roughness":
+		# Moving either slider changes the finish to whichever preset it now matches, or Custom.
+		settings["material"] = SurfaceMaterials.name_for(float(settings["metallic"]), float(settings["roughness"]))
+		_panel.set_control_value("material", settings["material"])
 	_apply(key)
 	_save_settings()
 
@@ -185,9 +200,9 @@ func _apply(key: String) -> void:
 		"shape":
 			_grid.set_shape(str(value))
 		"height_mode":
-			_grid.material.set_shader_parameter("height_mode", GridView.HEIGHT_MODES.find(str(value)))
+			_grid.set_shared_parameter("height_mode", GridView.HEIGHT_MODES.find(str(value)))
 		"height_invert":
-			_grid.material.set_shader_parameter("height_invert", bool(value))
+			_grid.set_shared_parameter("height_invert", bool(value))
 		"height_amount":
 			_grid.set_height_amount(float(value))
 		"columns":
@@ -195,13 +210,13 @@ func _apply(key: String) -> void:
 		"shape_size":
 			_grid.material.set_shader_parameter("shape_size", float(value))
 		"color_mode":
-			_grid.material.set_shader_parameter("color_mode", GridView.COLOR_MODES.find(str(value)))
+			_grid.set_shared_parameter("color_mode", GridView.COLOR_MODES.find(str(value)))
 		"levels":
-			_grid.material.set_shader_parameter("levels", float(value))
+			_grid.set_shared_parameter("levels", float(value))
 		"metallic":
-			_grid.material.set_shader_parameter("metallic_amount", float(value))
+			_grid.set_shared_parameter("metallic_amount", float(value))
 		"roughness":
-			_grid.material.set_shader_parameter("roughness_amount", float(value))
+			_grid.set_shared_parameter("roughness_amount", float(value))
 		"light":
 			_light.light_energy = float(value)
 		"shadows":

@@ -19,7 +19,7 @@ Everything stays on the GPU, so changing a setting or a frame costs no CPU work.
 
 ## Controls
 
-- Drag: move the image. Shift-drag or right drag: orbit. Wheel, pinch: zoom. Trackpad scroll: pan.
+- Drag: rotate. Command-drag, right or middle drag: move the image. Wheel, pinch: zoom. Trackpad scroll: pan.
 - Double-click: reset the view. `H`: hide or show the panel.
 
 ## Shapes

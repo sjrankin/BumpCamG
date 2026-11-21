@@ -14,6 +14,8 @@ const HEIGHT_MODES: Array[String] = [
 const COLOR_MODES: Array[String] = ["Color", "Grayscale", "Posterized"]
 
 var material: ShaderMaterial
+var wire_material: ShaderMaterial
+var fill_material: ShaderMaterial
 var pass_material: ShaderMaterial
 var columns := 64
 var rows := 36
@@ -21,6 +23,7 @@ var shape_name := "Blocks"
 var height_amount := 2.0
 
 var _multimesh: MultiMesh
+var _instance: MultiMeshInstance3D
 var _viewport: SubViewport
 var _rect: ColorRect
 var _source: Texture2D
@@ -56,6 +59,12 @@ func set_shape(new_shape: String) -> void:
 	if _multimesh == null:
 		return
 	_multimesh.mesh = ShapeLibrary.make(new_shape)
+	if ShapeLibrary.is_wireframe(new_shape):
+		_instance.material_override = wire_material
+	elif ShapeLibrary.is_filled_wireframe(new_shape):
+		_instance.material_override = fill_material
+	else:
+		_instance.material_override = material
 	material.set_shader_parameter("bar_mode", ShapeLibrary.is_bar(new_shape))
 	material.set_shader_parameter("hue_pointer", ShapeLibrary.is_hue_pointer(new_shape))
 
@@ -68,8 +77,40 @@ func set_columns(count: int) -> void:
 
 func set_height_amount(amount: float) -> void:
 	height_amount = amount
-	material.set_shader_parameter("height_amount", amount)
+	set_shared_parameter("height_amount", amount)
 	_update_bounds()
+
+
+## Reads the grid back from the GPU and mirrors the shader's height maths on the CPU.
+func build_height_field() -> HeightField:
+	var image := _viewport.get_texture().get_image()
+	var mode: int = material.get_shader_parameter("height_mode")
+	var invert: bool = material.get_shader_parameter("height_invert")
+	var color_mode: int = material.get_shader_parameter("color_mode")
+	var levels: float = material.get_shader_parameter("levels")
+	var heights := PackedFloat32Array()
+	heights.resize(columns * rows)
+	for j in rows:
+		for i in columns:
+			var c := image.get_pixel(i, j)
+			if color_mode == 1:
+				var luma := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
+				c = Color(luma, luma, luma)
+			elif color_mode == 2:
+				c = Color(floorf(c.r * levels + 0.5) / levels, floorf(c.g * levels + 0.5) / levels, floorf(c.b * levels + 0.5) / levels)
+			var value := 0.0
+			match mode:
+				1: value = c.r * 0.299 + c.g * 0.587 + c.b * 0.114
+				2: value = c.r
+				3: value = c.g
+				4: value = c.b
+				5: value = c.s
+				6: value = c.h
+			value = clampf(value, 0.0, 1.0)
+			if mode != 0 and invert:
+				value = 1.0 - value
+			heights[j * columns + i] = value * height_amount
+	return HeightField.new(columns, rows, SCENE_WIDTH / float(columns), heights)
 
 
 func _process(_delta: float) -> void:
@@ -95,10 +136,23 @@ func _build_instances() -> void:
 	material.set_shader_parameter("grid_tex", _viewport.get_texture())
 	_multimesh = MultiMesh.new()
 	_multimesh.transform_format = MultiMesh.TRANSFORM_3D
-	var instance := MultiMeshInstance3D.new()
-	instance.multimesh = _multimesh
-	instance.material_override = material
-	add_child(instance)
+	_instance = MultiMeshInstance3D.new()
+	_instance.multimesh = _multimesh
+	_instance.material_override = material
+	add_child(_instance)
+	wire_material = ShaderMaterial.new()
+	wire_material.shader = load("res://shaders/wireframe.gdshader")
+	wire_material.set_shader_parameter("grid_tex", _viewport.get_texture())
+	fill_material = ShaderMaterial.new()
+	fill_material.shader = load("res://shaders/filled_wireframe.gdshader")
+	fill_material.set_shader_parameter("grid_tex", _viewport.get_texture())
+
+
+## Sets a shader parameter that the shape, wireframe and filled wireframe materials share.
+func set_shared_parameter(parameter: String, value: Variant) -> void:
+	material.set_shader_parameter(parameter, value)
+	wire_material.set_shader_parameter(parameter, value)
+	fill_material.set_shader_parameter(parameter, value)
 
 
 ## Lays out one instance per cell. The shader recovers the cell from the instance position.
@@ -109,8 +163,8 @@ func _rebuild_grid() -> void:
 	_rect.position = Vector2.ZERO
 	_rect.size = Vector2(columns, rows)
 	pass_material.set_shader_parameter("grid_size", Vector2(columns, rows))
-	material.set_shader_parameter("grid_dims", Vector2i(columns, rows))
-	material.set_shader_parameter("cell_size", cell)
+	set_shared_parameter("grid_dims", Vector2i(columns, rows))
+	set_shared_parameter("cell_size", cell)
 
 	var count := columns * rows
 	_multimesh.instance_count = count

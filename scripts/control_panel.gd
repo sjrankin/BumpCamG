@@ -8,10 +8,13 @@ signal source_selected(index: int)
 signal open_image_requested
 signal save_image_requested
 signal reset_view_requested
+signal tour_requested
 
 const PANEL_WIDTH := 340.0
 
 var _settings: Dictionary = {}
+## Option buttons and sliders by setting key, so they can be updated from outside.
+var _controls: Dictionary = {}
 var _box: VBoxContainer
 var _source_option: OptionButton
 var _status: Label
@@ -75,6 +78,7 @@ func setup(settings: Dictionary) -> void:
 	_add_color("Background", "background")
 
 	_add_heading("Lighting")
+	_add_option("Material", "material", SurfaceMaterials.NAMES)
 	_add_slider("Light", "light", 0.0, 3.0, 0.05)
 	_add_slider("Metallic", "metallic", 0.0, 1.0, 0.01)
 	_add_slider("Roughness", "roughness", 0.05, 1.0, 0.01)
@@ -82,8 +86,9 @@ func setup(settings: Dictionary) -> void:
 
 	_add_heading("View")
 	_box.add_child(_make_button("Reset View (double-click)", func() -> void: reset_view_requested.emit()))
+	_box.add_child(_make_button("Tour", func() -> void: tour_requested.emit()))
 	var hint := Label.new()
-	hint.text = "Drag: move the image. Shift or right drag: orbit.\nWheel or pinch: zoom.\nDrop an image on the window."
+	hint.text = "Drag: rotate. Command-drag: move the image.\nWheel or pinch: zoom.\nDrop an image on the window."
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.custom_minimum_size.x = 1.0
 	hint.modulate = Color(1, 1, 1, 0.6)
@@ -122,6 +127,20 @@ func set_sources(labels: Array[String], selected: int) -> void:
 		_source_option.select(selected)
 
 
+## Moves a slider or option button to `value` without emitting `changed`.
+func set_control_value(key: String, value: Variant) -> void:
+	if not _controls.has(key):
+		return
+	var control: Dictionary = _controls[key]
+	if control.has("slider"):
+		(control["slider"] as HSlider).set_value_no_signal(float(value))
+		(control["readout"] as Label).text = String.num(float(value), 2)
+	else:
+		var index: int = (control["values"] as Array).find(value)
+		if index >= 0:
+			(control["option"] as OptionButton).select(index)
+
+
 ## Shows a warning under the input list; an empty string hides it.
 func set_status(text: String) -> void:
 	_status.text = text
@@ -158,6 +177,7 @@ func _add_option(text: String, key: String, values: Array) -> void:
 		if values[index] == _settings[key]:
 			option.select(index)
 	option.item_selected.connect(func(index: int) -> void: changed.emit(key, values[index]))
+	_controls[key] = {"option": option, "values": values}
 	_add_row(text, option)
 
 
@@ -177,6 +197,7 @@ func _add_slider(text: String, key: String, low: float, high: float, step: float
 	slider.value_changed.connect(func(value: float) -> void:
 		readout.text = String.num(value, 2)
 		changed.emit(key, value))
+	_controls[key] = {"slider": slider, "readout": readout}
 	row.add_child(slider)
 	row.add_child(readout)
 	_add_row(text, row)

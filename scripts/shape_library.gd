@@ -7,7 +7,7 @@ extends RefCounted
 
 const NAMES: Array[String] = [
 	"Blocks", "Spheres", "Cones", "Pyramids", "Cylinders", "Rings",
-	"Squares", "Circles", "Triangles", "Diamonds", "Hexagons", "Stars", "Hue Pointers",
+	"Squares", "Circles", "Triangles", "Diamonds", "Hexagons", "Stars", "Hue Pointers", "Wireframe", "Filled Wireframe",
 ]
 
 ## Shapes built as prisms spanning z = -0.5..0.5, which the shader stretches into bars like Blocks.
@@ -24,6 +24,16 @@ static func is_bar(shape_name: String) -> bool:
 
 
 ## True for shapes the shader turns to point along the colour's hue.
+## True for the continuous wireframe, which has its own mesh and shader.
+static func is_wireframe(shape_name: String) -> bool:
+	return shape_name == "Wireframe"
+
+
+## True for the wireframe whose cells are filled in.
+static func is_filled_wireframe(shape_name: String) -> bool:
+	return shape_name == "Filled Wireframe"
+
+
 static func is_hue_pointer(shape_name: String) -> bool:
 	return shape_name == "Hue Pointers"
 
@@ -69,6 +79,31 @@ static func _build(shape_name: String) -> Mesh:
 			return _prism(_ngon(6, 0.5, 0.0), false)
 		"Stars":
 			return _prism(_star(5, 0.5, 0.42, PI / 2.0), false)
+		"Wireframe":
+			# Two segments per cell: to the neighbour on the right and the one below. The shader reads
+			# these vertex positions as neighbour offsets, not as geometry.
+			var st := SurfaceTool.new()
+			st.begin(Mesh.PRIMITIVE_LINES)
+			for end in [Vector3.ZERO, Vector3.RIGHT, Vector3.ZERO, Vector3.DOWN]:
+				st.add_vertex(end)
+			return st.commit()
+		"Filled Wireframe":
+			# Surface 0: two triangles per cell (COLOR.r = 1). Surface 1: the wires (COLOR.r = 0).
+			# As for "Wireframe", the vertex positions are neighbour offsets read by the shader.
+			var mesh := ArrayMesh.new()
+			var fill := SurfaceTool.new()
+			fill.begin(Mesh.PRIMITIVE_TRIANGLES)
+			fill.set_color(Color(1, 0, 0))
+			for corner in [Vector3.ZERO, Vector3.RIGHT, Vector3.DOWN, Vector3.RIGHT, Vector3(1, -1, 0), Vector3.DOWN]:
+				fill.add_vertex(corner)
+			fill.commit(mesh)
+			var wires := SurfaceTool.new()
+			wires.begin(Mesh.PRIMITIVE_LINES)
+			wires.set_color(Color(0, 0, 0))
+			for end in [Vector3.ZERO, Vector3.RIGHT, Vector3.ZERO, Vector3.DOWN]:
+				wires.add_vertex(end)
+			wires.commit(mesh)
+			return mesh
 		"Hue Pointers":
 			# An arrowhead that points up at hue 0; the shader turns it clockwise by the hue.
 			return _prism(PackedVector2Array([
